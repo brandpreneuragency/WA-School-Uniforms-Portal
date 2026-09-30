@@ -2,33 +2,55 @@
 
 A deliberately small school-uniform order request portal for Wagner Atelier.
 
-Parents enter student/contact details, select uniform items, sizes and quantities, then submit one order request. There is **no account system, database, checkout or online payment**. The server validates the selected items against the local catalogue and emails the request to Wagner Atelier.
+Parents enter student/contact details, select uniform items, sizes and quantities, then submit one order request. There is **no online payment**. Requests are stored in SQLite and can also be e-mailed to Wagner Atelier.
 
-## Stack
+## Included
 
-- Next.js App Router
-- React + TypeScript
-- Plain CSS
-- Catalogue stored in `data/catalog.ts`
-- One API route: `POST /api/order`
-- Resend HTTP API for production e-mail delivery
+- Public uniform catalogue
+- Student + parent order form
+- Size and quantity selection
+- SQLite persistence
+- Resend e-mail notifications
+- Password-protected `/admin`
+- Catalogue management
+- Orders list, filters and order detail
+- Order status workflow
 
-No Prisma, PostgreSQL, auth library, admin panel or state-management dependency.
+No Prisma, PostgreSQL, parent accounts, multi-role school hierarchy or ERP-style architecture.
 
-## Local development
+## Requirements
+
+- Node.js 22.13 or newer
+
+The project uses Node's built-in `node:sqlite` module, which is available without a separate database package on supported Node 22 releases. citeturn142496search0
+
+## Run locally
 
 ```bash
 npm install
 npm run dev
 ```
 
-Development defaults to `ORDER_EMAIL_MODE=console`, so submitted orders are printed in the server console instead of being sent.
+Open:
 
-## Production e-mail
+- Parent portal: `http://localhost:3000`
+- Admin: `http://localhost:3000/admin`
 
-Copy `.env.example` to your deployment environment and set:
+In development, if `ADMIN_PASSWORD` is not set, the admin password is:
+
+```text
+admin
+```
+
+## Environment
+
+Copy `.env.example` to `.env.local` and set real values before deployment.
 
 ```env
+ADMIN_PASSWORD=choose-a-strong-password
+ADMIN_SESSION_SECRET=choose-a-long-random-secret
+SQLITE_PATH=.data/portal.sqlite
+
 ORDER_EMAIL_MODE=resend
 RESEND_API_KEY=re_xxxxxxxxx
 ORDER_EMAIL_TO=orders@example.com
@@ -36,32 +58,49 @@ ORDER_EMAIL_FROM=Wagner Atelier Orders <orders@your-verified-domain.com>
 ORDER_REPLY_TO=orders@example.com
 ```
 
-`ORDER_EMAIL_FROM` must use a sender/domain verified by Resend.
+In development, e-mail defaults to console mode when `ORDER_EMAIL_MODE` is omitted.
 
-## Editing the catalogue
+## Admin
 
-All school and product data is intentionally kept in one file:
+### Catalogue
 
-`data/catalog.ts`
+`/admin/catalogue`
 
-There you can change:
+You can add, edit, hide and delete products; change prices, sizes, Required/Optional status, display order and image paths.
 
-- school name and tagline
-- currency and locale
-- whether prices are visible
-- grade options
-- product names/descriptions
-- product prices
-- product sizes
-- required vs optional groups
-- product image paths
+The original records in `data/catalog.ts` are used only to seed a brand-new empty SQLite database. After first run, SQLite becomes the live catalogue source.
 
-Replace the placeholder SVG files in `public/products/` with real product photos while keeping the same paths, or update the paths in the catalogue.
+### Orders
 
-## Order security
+`/admin/orders`
 
-The browser submits only product IDs, chosen sizes and quantities. The API route re-loads the real catalogue and recalculates prices server-side, so a visitor cannot change product prices by editing the browser payload. Required contact fields are validated server-side and a honeypot field is included for basic bot filtering.
+Each order is stored **before** the e-mail notification is attempted. If Resend fails, the request still appears in Admin.
+
+Workflow:
+
+```text
+New → Confirmed → In production → Ready → Completed
+                                      ↘ Cancelled
+```
+
+The detail page shows student/parent details, measurements, notes, selected items, quantities, totals and e-mail delivery status.
+
+## Database
+
+Default path:
+
+```text
+.data/portal.sqlite
+```
+
+The directory is gitignored. Back up this file on the VPS. You can move it with `SQLITE_PATH`.
+
+## Security
+
+Product IDs, sizes and quantities come from the browser, but the order endpoint reloads the actual products from SQLite and recalculates prices server-side.
+
+Admin authentication uses one password plus a signed, HTTP-only session cookie. This intentionally avoids a full user/account system.
 
 ## Deployment
 
-Works on any standard Next.js host (Vercel, Node server, Docker-capable VPS, etc.). The only required production integration is the e-mail environment configuration above.
+This version is designed for a persistent Node/VPS environment because it uses a local SQLite file. Do not deploy it to ephemeral serverless storage unless the database layer is changed.
