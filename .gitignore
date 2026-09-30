@@ -4,5 +4,6 @@ out
 .env
 .env.local
 .env.production
+.data/
 .DS_Store
 npm-debug.log*
