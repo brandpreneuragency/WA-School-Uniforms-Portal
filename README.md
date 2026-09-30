@@ -22,7 +22,7 @@ No Prisma, PostgreSQL, parent accounts, multi-role school hierarchy or ERP-style
 
 - Node.js 22.13 or newer
 
-The project uses Node's built-in `node:sqlite` module, which is available without a separate database package on supported Node 22 releases. citeturn142496search0
+The project uses Node's built-in `node:sqlite` module, which is available without a separate database package on supported Node 22 releases.
 
 ## Run locally
 
