@@ -1,8 +1,11 @@
+import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
-import { portalConfig, products } from "@/data/catalog";
+import { portalConfig } from "@/data/catalog";
+import { getProduct, insertOrder, markOrderEmailResult } from "@/lib/db";
+
+export const runtime = "nodejs";
 
 type IncomingItem = { productId?: unknown; size?: unknown; quantity?: unknown };
-
 type IncomingOrder = {
   studentName?: unknown;
   grade?: unknown;
@@ -36,7 +39,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: "Invalid request." }, { status: 400 });
   }
 
-  // Honeypot. Real users never see or populate this field.
   if (clean(payload.website, 100)) return NextResponse.json({ ok: true });
 
   const studentName = clean(payload.studentName, 120);
@@ -57,20 +59,48 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: "Please add at least one valid item." }, { status: 400 });
   }
 
-  const normalizedItems = [] as Array<{ name: string; size: string; quantity: number; unitPrice: number; total: number }>;
+  const normalizedItems = [] as Array<{ productId: string; name: string; size: string; quantity: number; unitPrice: number; total: number }>;
   for (const raw of payload.items as IncomingItem[]) {
     const productId = clean(raw.productId, 80);
     const size = clean(raw.size, 30);
     const quantity = Number(raw.quantity);
-    const product = products.find((candidate) => candidate.id === productId);
-    if (!product || !product.sizes.includes(size) || !Number.isInteger(quantity) || quantity < 1 || quantity > 20) {
+    const product = getProduct(productId);
+    if (!product || !product.active || !product.sizes.includes(size) || !Number.isInteger(quantity) || quantity < 1 || quantity > 20) {
       return NextResponse.json({ message: "One or more selected products are invalid. Please review your order." }, { status: 400 });
     }
-    normalizedItems.push({ name: product.name, size, quantity, unitPrice: product.price, total: product.price * quantity });
+    normalizedItems.push({ productId, name: product.name, size, quantity, unitPrice: product.price, total: product.price * quantity });
   }
 
   const total = normalizedItems.reduce((sum, item) => sum + item.total, 0);
-  const reference = `WA-${new Date().toISOString().slice(0, 10).replaceAll("-", "")}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
+  const createdAt = new Date().toISOString();
+  const reference = `WA-${createdAt.slice(0, 10).replaceAll("-", "")}-${randomUUID().slice(0, 8).toUpperCase()}`;
+
+  insertOrder({
+    id: reference,
+    createdAt,
+    studentName,
+    grade,
+    parentName,
+    email,
+    phone,
+    height,
+    chest,
+    waist,
+    notes,
+    status: "NEW",
+    currency: portalConfig.currency,
+    total,
+    emailSent: false,
+    emailError: ""
+  }, normalizedItems.map((item) => ({
+    orderId: reference,
+    productId: item.productId,
+    productName: item.name,
+    size: item.size,
+    quantity: item.quantity,
+    unitPrice: item.unitPrice,
+    total: item.total
+  })));
 
   const itemsHtml = normalizedItems.map((item) => `
     <tr>
@@ -104,6 +134,7 @@ export async function POST(request: Request) {
   const mode = process.env.ORDER_EMAIL_MODE || (process.env.NODE_ENV === "production" ? "resend" : "console");
   if (mode === "console") {
     console.log("[order-request]", { reference, studentName, grade, parentName, email, phone, normalizedItems, total, notes });
+    markOrderEmailResult(reference, true);
     return NextResponse.json({ ok: true, reference });
   }
 
@@ -111,26 +142,38 @@ export async function POST(request: Request) {
   const to = process.env.ORDER_EMAIL_TO;
   const from = process.env.ORDER_EMAIL_FROM;
   if (!apiKey || !to || !from) {
-    console.error("Order e-mail configuration is incomplete.");
-    return NextResponse.json({ message: "Order e-mail is not configured. Please contact Wagner Atelier directly." }, { status: 503 });
+    const error = "Order e-mail configuration is incomplete.";
+    console.error(error);
+    markOrderEmailResult(reference, false, error);
+    return NextResponse.json({ ok: true, reference, warning: "Order saved, but e-mail delivery is not configured." });
   }
 
-  const emailResponse = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      from,
-      to: [to],
-      reply_to: process.env.ORDER_REPLY_TO || email,
-      subject: `${reference} · ${studentName} · School uniform request`,
-      html
-    })
-  });
+  try {
+    const emailResponse = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        from,
+        to: [to],
+        reply_to: process.env.ORDER_REPLY_TO || email,
+        subject: `${reference} · ${studentName} · School uniform request`,
+        html
+      })
+    });
 
-  if (!emailResponse.ok) {
-    console.error("Resend request failed", emailResponse.status, await emailResponse.text());
-    return NextResponse.json({ message: "We could not send the order request. Please try again." }, { status: 502 });
+    if (!emailResponse.ok) {
+      const error = `Resend ${emailResponse.status}: ${(await emailResponse.text()).slice(0, 700)}`;
+      console.error(error);
+      markOrderEmailResult(reference, false, error);
+      return NextResponse.json({ ok: true, reference, warning: "Order saved, but the notification e-mail could not be delivered." });
+    }
+
+    markOrderEmailResult(reference, true);
+    return NextResponse.json({ ok: true, reference });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown e-mail error";
+    console.error("Order e-mail failed", message);
+    markOrderEmailResult(reference, false, message);
+    return NextResponse.json({ ok: true, reference, warning: "Order saved, but the notification e-mail could not be delivered." });
   }
-
-  return NextResponse.json({ ok: true, reference });
 }
