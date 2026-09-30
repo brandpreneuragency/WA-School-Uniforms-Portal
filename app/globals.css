@@ -70,7 +70,7 @@ a { color: inherit; }
 .site-header nav a:hover { color: var(--navy); }
 .site-header nav a.active { color: var(--navy); }
 .site-header nav a.active::after { content: ""; position: absolute; right: 0; bottom: -1px; left: 0; height: 2px; background: var(--navy); }
-.nav-badge { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 5px; color: #fff; background: var(--navy); border-radius: 999px; font-size: 10px; }
+
 .header-note { justify-self: end; color: var(--muted); font-size: 12px; }
 .header-note strong { color: var(--ink); }
 
@@ -171,7 +171,6 @@ a { color: inherit; }
 .count-pill { display: inline-flex; align-items: center; gap: 5px; min-width: 42px; height: 30px; justify-content: center; color: var(--navy); background: var(--surface-blue); border-radius: 999px; font-size: 11px; font-weight: 800; }
 .count-pill svg { width: 15px; height: 15px; }
 .student-preview { display: flex; align-items: center; gap: 11px; padding: 15px 0; border-bottom: 1px solid var(--line); }
-.avatar { display: grid; place-items: center; width: 38px; height: 38px; flex: 0 0 auto; color: #fff; background: var(--navy); border-radius: 50%; font-family: Georgia, serif; font-size: 15px; }
 .student-preview strong, .student-preview span { display: block; }
 .student-preview strong { font-size: 12px; }
 .student-preview div span { margin-top: 3px; color: var(--muted-2); font-size: 10px; }

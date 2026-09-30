@@ -42,7 +42,7 @@ const initialForm: FormState = {
   website: ""
 };
 
-function productDrafts() {
+function productDrafts(products: Product[]) {
   return Object.fromEntries(products.map((product) => [product.id, { size: product.sizes[0], quantity: 1 }])) as Record<string, ProductDraft>;
 }
 
@@ -106,7 +106,7 @@ export function OrderPortal({ products }: { products: Product[] }) {
   const selectedDetailed = useMemo(() => selected.map((item) => ({
     ...item,
     product: products.find((product) => product.id === item.productId)!
-  })), [selected]);
+  })), [selected, products]);
 
   const subtotal = selectedDetailed.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
   const itemCount = selected.reduce((sum, item) => sum + item.quantity, 0);
@@ -168,7 +168,6 @@ export function OrderPortal({ products }: { products: Product[] }) {
         </div>
         <nav aria-label="Primary navigation">
           <a href="#catalogue" className="active">Catalogue</a>
-          <a href="#order-summary">My selections <span className="nav-badge">{itemCount}</span></a>
           <a href="mailto:orders@wagneratelier.co">Help</a>
         </nav>
         <div className="header-note">Uniform ordering by <strong>{portalConfig.contactBrand}</strong></div>
@@ -272,7 +271,6 @@ export function OrderPortal({ products }: { products: Product[] }) {
             </div>
 
             <div className="student-preview">
-              <span className="avatar">{form.studentName.trim().slice(0, 1).toUpperCase() || "S"}</span>
               <div><strong>{form.studentName || "Student name"}</strong><span>{form.grade || "Grade not selected"}</span></div>
             </div>
 
