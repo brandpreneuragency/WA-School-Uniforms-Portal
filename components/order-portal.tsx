@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Image from "next/image";
-import { formatMoney, portalConfig, products, type Product } from "@/data/catalog";
+import { formatMoney, portalConfig, type Product } from "@/data/catalog";
 import { ArrowIcon, CartIcon, CheckIcon, InfoIcon, MailIcon } from "@/components/icons";
 
 type SelectedItem = {
@@ -96,9 +96,9 @@ function ProductCard({ product, draft, selected, onDraft, onAdd }: {
   );
 }
 
-export function OrderPortal() {
+export function OrderPortal({ products }: { products: Product[] }) {
   const [form, setForm] = useState<FormState>(initialForm);
-  const [drafts, setDrafts] = useState<Record<string, ProductDraft>>(productDrafts);
+  const [drafts, setDrafts] = useState<Record<string, ProductDraft>>(() => productDrafts(products));
   const [selected, setSelected] = useState<SelectedItem[]>([]);
   const [status, setStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
   const [message, setMessage] = useState("");
